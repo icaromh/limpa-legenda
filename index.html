@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Converter Legenda</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            margin: 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: 65px auto;
+            grid-column-gap: 0px;
+            grid-row-gap: 0px;
+            height: 100%;
+        }
+
+        h1 {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            margin: 0;
+            display: inline;
+        }
+
+        .heading {
+            padding: 1rem;
+            align-content: center;
+            grid-area: 1 / 1;
+        }
+
+        .column2,
+        .column1 {
+            padding: 1rem;
+        }
+
+        .column1 {
+            grid-area: 2 / 1;
+        }
+
+        .column2 {
+            grid-area: 2 / 2
+        }
+
+        textarea {
+            margin-top: 1rem;
+            display: flex;
+            flex-grow: 1;
+            width: 100%;
+            height: calc(100% - 70px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="grid">
+        <div class="heading">
+            <h1>1. Primeiro seleciona a legenda!</h1>
+            <input type="file" id="file-input" placeholder="Buscar arquivo srt" />
+        </div>
+
+        <div class="column1">
+            <div>
+                <h1 style="opacity: .7;">Original</h1>
+            </div>
+            <textarea id="original" disabled></textarea>
+        </div>
+
+        <div class="column2">
+            <div>
+                <h1>2. Pode editar aqui se quiser e depois</h1>
+                <button id="download-button">
+                    3. ⬇️ Fazer download
+                </button>
+            </div>
+
+
+            <textarea id="cleaned"></textarea>
+        </div>
+    </div>
+
+
+    <script>
+
+        function numeroPorExtenso(num) {
+            if (num < 0 || num > 1e15) throw new Error('Número fora do limite suportado.');
+
+            const unidades = [
+                'zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'
+            ];
+            const especiais = [
+                '', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'
+            ];
+            const dezenas = [
+                '', 'dez', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'
+            ];
+            const centenas = [
+                '', 'cem', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'
+            ];
+            const grandes = [
+                '', 'mil', 'milhão', 'bilhão', 'trilhão', 'quatrilhão'
+            ];
+
+            function porExtenso(num) {
+                if (num < 10) return unidades[num];
+                if (num > 10 && num < 20) return especiais[num - 10];
+                if (num < 100) {
+                    const dezena = Math.floor(num / 10);
+                    const resto = num % 10;
+                    return dezenas[dezena] + (resto ? ` e ${unidades[resto]}` : '');
+                }
+                if (num < 1000) {
+                    let centena = Math.floor(num / 100);
+                    let resto = num % 100;
+                    let centenaTexto = centena === 1 && resto > 0 ? 'cento' : centenas[centena];
+                    return centenaTexto + (resto ? ` e ${porExtenso(resto)}` : '');
+                }
+
+                for (let i = grandes.length - 1; i >= 0; i--) {
+                    const divisor = Math.pow(1000, i);
+                    if (num >= divisor) {
+                        const parteMaior = Math.floor(num / divisor);
+                        const resto = num % divisor;
+                        const plural = i > 1 && parteMaior > 1 ? 's' : '';
+                        const grandeTexto = grandes[i] + plural;
+                        return `${porExtenso(parteMaior)} ${grandeTexto}` + (resto ? ` e ${porExtenso(resto)}` : '');
+                    }
+                }
+
+                return '';
+            }
+
+            return porExtenso(num);
+        }
+
+        function converterParaNumeroPorExtenso(input) {
+            // Verifica se a string contém apenas dígitos usando uma expressão regular
+            if (!/^\d+$/.test(input)) {
+                return input
+            }
+
+            // Converte a string para número
+            const numero = parseInt(input, 10);
+
+            // Chama a função principal para converter o número em texto por extenso
+            return numeroPorExtenso(numero);
+        }
+
+        function cleanFile(legenda) {
+            const chunks = legenda.split('\n')
+
+            for (let i = 0; i < chunks.length; i += 4) {
+                const srtIdx = i + 2
+                if (chunks[i]) {
+                    let line = chunks[srtIdx]
+
+                    // Lowercase
+                    line = line.substring(0, 1).toLocaleLowerCase() + line.substring(1, line.length)
+
+
+                    // Remove final point in the end of each phrase
+                    if (line.substring(line.length - 1) === '.') {
+                        line = line.substring(0, line.length - 1)
+                    }
+
+                    // Lowercase IA always
+                    line = line.replace(/IA/, 'ia')
+
+                    // Trocar números por texto
+                    const words = line.split(' ')
+                    line = words.map((word) => converterParaNumeroPorExtenso(word)).join(' ')
+
+                    chunks[srtIdx] = line
+                }
+            }
+
+            return chunks.join('\n')
+        }
+
+        function syncScrolls(el, target) {
+            el.addEventListener('scroll', (e) => {
+                target.scrollTop = e.target.scrollTop
+            })
+        }
+
+        function listenFileUpload(originalEl, cleanedEl) {
+            let fileInput = document.getElementById("file-input");
+
+            fileInput.onchange = () => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalEl.innerHTML = e.target.result
+
+                    const clean = cleanFile(e.target.result)
+                    cleanedEl.innerHTML = clean
+                };
+
+                for (let file of fileInput.files) {
+                    reader.readAsText(file);
+                }
+            };
+        }
+
+        function download(filename, text) {
+            // Criação de um Blob com o conteúdo do texto
+            const blob = new Blob([text], { type: 'text/plain' });
+
+            // Criação de uma URL temporária para o Blob
+            const url = URL.createObjectURL(blob);
+
+            // Criação de um elemento <a> temporário para disparar o download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename; // Nome do arquivo a ser baixado
+            document.body.appendChild(a);
+            a.click();
+
+            // Remoção do elemento e da URL temporária
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            let fileInput = document.getElementById("file-input");
+            let originalEl = document.getElementById("original");
+            let cleanedEl = document.getElementById("cleaned");
+            let buttonEl = document.getElementById("download-button");
+
+
+            buttonEl.addEventListener('click', () => {
+                const name = fileInput.files[0].name;
+                if (name) {
+                    const filename = name.replace('.srt', '-limpo.srt')
+                    download(filename, cleanedEl.value)
+                }
+            })
+
+            syncScrolls(cleanedEl, originalEl)
+            listenFileUpload(originalEl, cleanedEl)
+        })
+    </script>
+</body>
+
+</html>
