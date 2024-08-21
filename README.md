@@ -11,4 +11,4 @@ Limpa legenda permite fazer o upload de um arquivo `.srt` e transforma ele com a
 
 Após a transformação é possível editar o arquivo final e fazer download;
 
-![legenda-ezgif.com-video-to-gif-converter.gif](legenda-ezgif.com-video-to-gif-converter.gif)
+![docs/legenda-ezgif.com-video-to-gif-converter.gif](docs/legenda-ezgif.com-video-to-gif-converter.gif)
